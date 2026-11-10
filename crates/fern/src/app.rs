@@ -43,6 +43,7 @@ pub struct App {
     pub focus: Focus,
     pub context: Context,
     pub quit: bool,
+    pub update: Option<String>,
 
     pub entries: Vec<Entry>,
     pub files_state: ListState,
@@ -94,6 +95,7 @@ impl App {
             focus: Focus::List,
             context: Context::Full,
             quit: false,
+            update: None,
             entries: Vec::new(),
             files_state: ListState::default(),
             status: Status::default(),
@@ -128,6 +130,7 @@ impl App {
             Msg::Changed => self.refresh_all(),
             Msg::Status(result) => self.apply_status(result),
             Msg::Preview(id, preview) => self.apply_preview(id, preview),
+            Msg::Update(version) => self.update = Some(version),
         }
     }
 }

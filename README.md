@@ -26,6 +26,8 @@ powershell -ExecutionPolicy Bypass -c "irm https://github.com/pnilssson/fern-tui
 
 Every push to `main` that passes CI is released with the next patch version.
 
+Update with `fern-update`. fern checks GitHub for a newer release once a day and shows a hint in the footer. Set `FERN_NO_UPDATE_CHECK=1` to turn the check off.
+
 ## Development
 
 Install the toolchain from `rust-toolchain.toml`, then:

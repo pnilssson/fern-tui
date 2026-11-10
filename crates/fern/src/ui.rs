@@ -58,10 +58,18 @@ fn footer_line(app: &App) -> Paragraph<'static> {
         Mode::Changes => "↑↓ move  → read  ⏎ reveal  f full/diff  n/N change  q quit",
     };
 
-    Paragraph::new(Span::styled(
+    let mut spans = vec![Span::styled(
         format!(" {hints}"),
         Style::new().fg(Color::DarkGray),
-    ))
+    )];
+    if let Some(version) = &app.update {
+        spans.push(Span::styled(
+            format!("  v{version} available, run fern-update"),
+            Style::new().fg(Color::Yellow),
+        ));
+    }
+
+    Paragraph::new(Line::from(spans))
 }
 
 fn pane(title: Line<'static>, focused: bool) -> Block<'static> {

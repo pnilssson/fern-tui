@@ -3,6 +3,7 @@ mod entries;
 mod highlight;
 mod preview;
 mod ui;
+mod update;
 mod watch;
 
 use std::io::{self, ErrorKind, Write};
@@ -23,6 +24,7 @@ pub enum Msg {
     Changed,
     Status(Result<Status, fern_git::Error>),
     Preview(u64, Preview),
+    Update(String),
 }
 
 fn main() -> io::Result<()> {
@@ -46,6 +48,7 @@ fn main() -> io::Result<()> {
             }
         }
     });
+    update::spawn(messages.clone());
     let _watcher = watch::start(&root, messages.clone());
 
     let mut app = App::new(root, cwd, in_repo, requests, messages);
