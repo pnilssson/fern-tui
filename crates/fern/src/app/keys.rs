@@ -1,0 +1,104 @@
+use ratatui::crossterm::event::{
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+};
+use ratatui::layout::Position;
+
+use super::nav::Step;
+use super::{App, Focus, Mode};
+
+const STEP: usize = 3;
+const SEEK: usize = 5;
+
+impl App {
+    pub(super) fn key(&mut self, key: KeyEvent) {
+        if key.kind == KeyEventKind::Release {
+            return;
+        }
+
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Char('c') if ctrl => self.quit = true,
+            KeyCode::Char('q') => self.quit = true,
+            KeyCode::Char('1') => self.set_mode(Mode::Files),
+            KeyCode::Char('2') => self.set_mode(Mode::Changes),
+            KeyCode::Char('0') => self.read(),
+            KeyCode::Tab => self.toggle_mode(),
+            KeyCode::Char('f') if !ctrl => self.toggle_context(),
+            KeyCode::Char('R') => self.refresh_all(),
+            KeyCode::Char('.') => self.toggle_hidden(),
+            KeyCode::Char('n') => self.jump_hunk(true),
+            KeyCode::Char('N') => self.jump_hunk(false),
+            KeyCode::Char('g') | KeyCode::Home => self.top(),
+            KeyCode::Char('G') | KeyCode::End => self.bottom(),
+            _ if self.focus == Focus::Preview => self.read_key(key.code, ctrl),
+            _ => self.list_key(key.code, ctrl),
+        }
+    }
+
+    fn top(&mut self) {
+        if self.focus == Focus::Preview {
+            self.scroll_up(usize::MAX);
+        } else {
+            self.move_sel(Step::Top);
+        }
+    }
+
+    fn bottom(&mut self) {
+        if self.focus == Focus::Preview {
+            self.scroll_down(usize::MAX);
+        } else {
+            self.move_sel(Step::Bottom);
+        }
+    }
+
+    fn list_key(&mut self, code: KeyCode, ctrl: bool) {
+        let page = self.page();
+        match code {
+            KeyCode::Up | KeyCode::Char('k') => self.move_sel(Step::Up(1)),
+            KeyCode::Down | KeyCode::Char('j') => self.move_sel(Step::Down(1)),
+            KeyCode::Char('u') if ctrl => self.move_sel(Step::Up(page / 2)),
+            KeyCode::Char('d') if ctrl => self.move_sel(Step::Down(page / 2)),
+            KeyCode::PageUp => self.move_sel(Step::Up(page)),
+            KeyCode::Char('b') if ctrl => self.move_sel(Step::Up(page)),
+            KeyCode::PageDown => self.move_sel(Step::Down(page)),
+            KeyCode::Char('f') if ctrl => self.move_sel(Step::Down(page)),
+            KeyCode::Char('K') => self.scroll_up(SEEK),
+            KeyCode::Char('J') => self.scroll_down(SEEK),
+            KeyCode::Left | KeyCode::Char('h') | KeyCode::Backspace => self.go_up(),
+            KeyCode::Enter if self.mode == Mode::Changes => self.reveal(),
+            KeyCode::Right | KeyCode::Char('l') | KeyCode::Enter => self.open(),
+            _ => {}
+        }
+    }
+
+    fn read_key(&mut self, code: KeyCode, ctrl: bool) {
+        let page = self.page();
+        match code {
+            KeyCode::Up | KeyCode::Char('k') => self.scroll_up(STEP),
+            KeyCode::Down | KeyCode::Char('j') => self.scroll_down(STEP),
+            KeyCode::Char('u') if ctrl => self.scroll_up(page / 2),
+            KeyCode::Char('d') if ctrl => self.scroll_down(page / 2),
+            KeyCode::PageUp => self.scroll_up(page),
+            KeyCode::Char('b') if ctrl => self.scroll_up(page),
+            KeyCode::PageDown => self.scroll_down(page),
+            KeyCode::Char('f') if ctrl => self.scroll_down(page),
+            KeyCode::Esc | KeyCode::Left | KeyCode::Char('h') | KeyCode::Backspace => {
+                self.focus = Focus::List;
+            }
+            _ => {}
+        }
+    }
+
+    pub(super) fn mouse(&mut self, mouse: MouseEvent) {
+        let over_preview = self
+            .preview_area
+            .contains(Position::new(mouse.column, mouse.row));
+        match mouse.kind {
+            MouseEventKind::ScrollUp if over_preview => self.scroll_up(STEP),
+            MouseEventKind::ScrollDown if over_preview => self.scroll_down(STEP),
+            MouseEventKind::ScrollUp => self.move_sel(Step::Up(1)),
+            MouseEventKind::ScrollDown => self.move_sel(Step::Down(1)),
+            _ => {}
+        }
+    }
+}

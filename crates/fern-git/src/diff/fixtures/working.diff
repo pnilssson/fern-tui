@@ -1,0 +1,16 @@
+diff --git a/src/main.rs b/src/main.rs
+index d588873..460dc36 100644
+--- a/src/main.rs
++++ b/src/main.rs
+@@ -1,8 +1,10 @@
+ fn main() {
+     let name = "app";
+-    println!("{name}");
++    println!("hello {name}");
+     -- a separator
++    ++ a marker
+     let total = 1;
+     let more = 2;
+     let last = 3;
++    let extra = 4;
+ }
