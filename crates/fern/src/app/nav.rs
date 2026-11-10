@@ -288,11 +288,11 @@ mod tests {
         select(&mut app, "repo");
         app.open();
         assert!(app.in_repo);
-        assert_eq!(app.root, repo);
+        assert_eq!(app.root.canonicalize().unwrap(), repo);
 
         app.go_up();
         assert!(!app.in_repo);
-        assert_eq!(app.root, base);
-        assert_eq!(app.cwd, base);
+        assert_eq!(app.root.canonicalize().unwrap(), base);
+        assert_eq!(app.cwd.canonicalize().unwrap(), base);
     }
 }
