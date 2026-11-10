@@ -28,11 +28,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     } else {
         String::new()
     };
-    let heading = format!(
-        "[2] Changes ({})  {}{ahead}{behind}",
-        rows.len(),
-        app.status.branch
-    );
+    let heading = format!("[2] ({}) {}{ahead}{behind}", rows.len(), app.status.branch);
     let block = pane(title(&heading, area.width), focused);
     list::draw(frame, area, block, rows, &mut app.changes_state, focused);
 }

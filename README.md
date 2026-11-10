@@ -1,14 +1,8 @@
 # fern
 
-A small, fast terminal browser for a git repository. Move through folders like yazi, and jump to the changed files like lazygit.
+A small, fast terminal browser for folders and git changes, inspired by [yazi](https://github.com/sxyazi/yazi) and [lazygit](https://github.com/jesseduffield/lazygit).
 
-- `1` Files: the repo tree. Arrow keys move in, out, up and down.
-- `2` Changes: the changed files, shown as the full file with changes marked. `f` switches to only the diff.
-- Right on a file reads it in the preview. Up and down scroll, Left goes back.
-
-Built with Rust and ratatui. Code is syntax highlighted with the terminal's own colors, so it fits whatever theme it runs in.
-
-Set `FERN_ROUNDED=1` to round the selection. It needs a font with the Powerline symbols, such as a Nerd Font.
+Browse any folder with a syntax highlighted preview next to the list. Inside a git repo a second pane lists the changed files, and the preview shows each one as the full file with the changes marked, or as a plain diff. The view follows the files on disk, so it updates as they change.
 
 ## Install
 
@@ -24,9 +18,23 @@ Windows:
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/pnilssson/fern-tui/releases/latest/download/fern-installer.ps1 | iex"
 ```
 
-Every push to `main` that passes CI is released with the next patch version.
+Update with `fern-update`. fern checks GitHub for a newer release once a day and shows a hint in the footer.
 
-Update with `fern-update`. fern checks GitHub for a newer release once a day and shows a hint in the footer. Set `FERN_NO_UPDATE_CHECK=1` to turn the check off.
+## Usage
+
+Run `fern` to browse the current folder, or `fern PATH` to start somewhere else. Press `?` to see every key.
+
+- `1` Files: move with the arrow keys. Left goes up a folder, right goes into a folder or opens a file in the preview.
+- `2` Changes: the changed files of the current repo. Enter reveals a file in Files, and `f` switches between the full file and only the diff.
+
+Copying paths and selected text needs `pbcopy` on macOS, `clip` on Windows, or `wl-copy`, `xclip` or `xsel` on Linux.
+
+## Configuration
+
+| Variable | Effect |
+| --- | --- |
+| `FERN_ROUNDED=1` | Rounds the selection. Needs a font with Powerline symbols, such as a Nerd Font. |
+| `FERN_NO_UPDATE_CHECK=1` | Turns off the daily update check. |
 
 ## Development
 
@@ -38,6 +46,8 @@ just check
 ```
 
 `just check` needs `just`, `cargo-deny`, `cargo-shear`, `cargo-nextest`, `typos` and `zizmor`.
+
+Every push to `main` that passes CI is released with the next patch version.
 
 ## License
 

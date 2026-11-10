@@ -2,13 +2,13 @@ use fern_git::Context;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
-use ratatui::text::Line;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, Paragraph};
 
 use super::wrap::wrap;
 use super::{center, clean, diff, dim, files, pane, title};
 use super::{paint, ruler};
-use crate::app::{App, Focus};
+use crate::app::{App, Focus, Selection, Visual};
 use crate::highlight::Colors;
 use crate::preview::Preview;
 
@@ -87,18 +87,27 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
     let skip = app.preview_scroll;
     let height = usize::from(inner.height);
     let cols = usize::from(inner.width);
-    match &app.preview {
-        Preview::Empty => {}
-        Preview::Message(text) => center(frame, inner, text),
+    let selection = app.selection;
+    let rows = match &app.preview {
+        Preview::Empty => Vec::new(),
+        Preview::Message(text) => {
+            center(frame, inner, text);
+            Vec::new()
+        }
         Preview::Text {
             lines,
             colors,
             truncated,
         } => {
-            let shown = fill((0..lines.len()).skip(skip), height, *truncated, |index| {
-                plain(&lines[index], colors.get(index), cols)
-            });
+            let (shown, rows) = fill(
+                (0..lines.len()).skip(skip),
+                (height, *truncated),
+                selection,
+                (|index| plain(&lines[index], colors.get(index), cols), |_| 0),
+            );
             frame.render_widget(Paragraph::new(shown), inner);
+
+            rows
         }
         Preview::Dir(entries) => {
             let base = if app.cwd_rel.is_empty() {
@@ -111,41 +120,83 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
                 .map(|spans| ListItem::new(Line::from(spans)))
                 .collect();
             frame.render_widget(List::new(items), inner);
+
+            Vec::new()
         }
         Preview::Diff { diff, colors } => {
             let digits = diff.width;
-            let shown = fill(
+            let (shown, rows) = fill(
                 (0..diff.rows.len()).skip(skip),
-                height,
-                diff.truncated,
-                |index| diff::lines(&diff.rows, colors, index, digits, cols),
+                (height, diff.truncated),
+                selection,
+                (
+                    |index| diff::lines(&diff.rows, colors, index, digits, cols),
+                    |index| diff::lead(&diff.rows, index),
+                ),
             );
             frame.render_widget(Paragraph::new(shown), inner);
+
+            rows
         }
-    }
+    };
+    app.preview_inner = inner;
+    app.preview_rows = rows;
 }
 
-fn fill<T>(
-    items: impl Iterator<Item = T>,
-    height: usize,
-    truncated: bool,
-    render: impl Fn(T) -> Vec<Line<'static>>,
-) -> Vec<Line<'static>> {
+fn fill(
+    items: impl Iterator<Item = usize>,
+    (height, truncated): (usize, bool),
+    selection: Option<Selection>,
+    (render, lead): (
+        impl Fn(usize) -> Vec<Line<'static>>,
+        impl Fn(usize) -> usize,
+    ),
+) -> (Vec<Line<'static>>, Vec<Visual>) {
     let mut shown = Vec::new();
-    for item in items {
+    let mut visuals = Vec::new();
+    for index in items {
         if shown.len() >= height {
             break;
         }
 
-        shown.extend(render(item));
+        let lead = lead(index);
+        let range = selection.and_then(|selection| selection.range(index));
+        let mut start = 0;
+        for line in render(index) {
+            let text: String = line
+                .spans
+                .iter()
+                .skip(lead)
+                .map(|span| span.content.as_ref())
+                .collect();
+            let length = text.chars().count();
+            let gutter = line.spans.iter().take(lead).map(Span::width).sum();
+            visuals.push(Visual {
+                row: index,
+                start,
+                gutter,
+                text,
+            });
+            shown.push(match range {
+                Some((from, to)) => paint::reverse(
+                    line,
+                    lead,
+                    from.saturating_sub(start),
+                    to.saturating_sub(start),
+                ),
+                None => line,
+            });
+            start += length;
+        }
     }
 
     if shown.len() < height && truncated {
         shown.push(Line::styled("… truncated", dim()));
     }
     shown.truncate(height);
+    visuals.truncate(height);
 
-    shown
+    (shown, visuals)
 }
 
 fn plain(text: &str, colors: Option<&Colors>, cols: usize) -> Vec<Line<'static>> {

@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::thread;
 
 use fern_git::{Error, Status};
@@ -30,13 +31,21 @@ impl App {
         let root = self.root.clone();
         let messages = self.messages.clone();
         thread::spawn(move || {
-            let _ = messages.send(Msg::Status(fern_git::status(&root)));
+            let _ = messages.send(Msg::Status(root.clone(), fern_git::status(&root)));
         });
     }
 
-    pub(super) fn apply_status(&mut self, result: Result<Status, Error>) {
+    pub(super) fn apply_status(&mut self, root: &Path, result: Result<Status, Error>) {
         let queued = self.refresh == Refresh::Queued;
         self.refresh = Refresh::Idle;
+        if !self.in_repo || root != self.root {
+            if queued {
+                self.refresh_git();
+            }
+
+            return;
+        }
+
         match result {
             Ok(status) => self.set_status(status),
             Err(error) => self.git_error = Some(error.to_string()),
@@ -87,6 +96,7 @@ impl App {
 
         if self.wanted_key != self.shown_key {
             self.preview_scroll = 0;
+            self.selection = None;
             self.shown_key.clone_from(&self.wanted_key);
         }
         self.preview = preview;
@@ -137,6 +147,7 @@ impl App {
         self.latest += 1;
         self.preview = preview;
         self.preview_scroll = 0;
+        self.selection = None;
         self.shown_key.clear();
     }
 }

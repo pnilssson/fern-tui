@@ -1,4 +1,5 @@
 mod app;
+mod clipboard;
 mod entries;
 mod highlight;
 mod preview;
@@ -7,8 +8,8 @@ mod update;
 mod watch;
 
 use std::io::{self, ErrorKind, Write};
-use std::path::PathBuf;
-use std::sync::mpsc::{self, Receiver};
+use std::path::{Component, Path, PathBuf};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::thread;
 
 use fern_git::Status;
@@ -22,7 +23,7 @@ use app::App;
 pub enum Msg {
     Input(Event),
     Changed,
-    Status(Result<Status, fern_git::Error>),
+    Status(PathBuf, Result<Status, fern_git::Error>),
     Preview(u64, Preview),
     Update(String),
 }
@@ -49,7 +50,6 @@ fn main() -> io::Result<()> {
         }
     });
     update::spawn(messages.clone());
-    let _watcher = watch::start(&root, messages.clone());
 
     let mut app = App::new(root, cwd, in_repo, requests, messages);
     let mut terminal = ratatui::try_init()?;
@@ -78,7 +78,7 @@ fn start() -> io::Result<Option<PathBuf>> {
         }
     }
 
-    let path = std::path::absolute(path)?;
+    let path = normalize(&std::path::absolute(path)?);
     if !path.is_dir() {
         let message = format!("{} is not a directory", path.display());
         return Err(io::Error::new(ErrorKind::NotADirectory, message));
@@ -87,12 +87,34 @@ fn start() -> io::Result<Option<PathBuf>> {
     Ok(Some(path))
 }
 
+fn normalize(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::ParentDir => {
+                out.pop();
+            }
+            Component::CurDir => {}
+            other => out.push(other),
+        }
+    }
+
+    out
+}
+
 fn run(terminal: &mut DefaultTerminal, app: &mut App, inbox: &Receiver<Msg>) -> io::Result<()> {
     while !app.quit {
+        app.expire_notice();
         terminal.draw(|frame| ui::draw(frame, app))?;
 
-        let Ok(message) = inbox.recv() else {
-            break;
+        let received = match app.notice_wait() {
+            Some(wait) => inbox.recv_timeout(wait),
+            None => inbox.recv().map_err(|_| RecvTimeoutError::Disconnected),
+        };
+        let message = match received {
+            Ok(message) => message,
+            Err(RecvTimeoutError::Timeout) => continue,
+            Err(RecvTimeoutError::Disconnected) => break,
         };
         app.handle(message);
         while let Ok(message) = inbox.try_recv() {
@@ -101,4 +123,18 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App, inbox: &Receiver<Msg>) -> 
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::normalize;
+
+    #[test]
+    fn normalize_resolves_parent_and_current_components() {
+        let path = Path::new("/a/b/../c/./d/..");
+
+        assert_eq!(normalize(path), PathBuf::from("/a/c"));
+    }
 }

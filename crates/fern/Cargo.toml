@@ -15,6 +15,9 @@ similar.workspace = true
 two-face.workspace = true
 unicode-width.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [package.metadata.dist]
 dist = true
 

@@ -28,6 +28,13 @@ struct Gutter {
     new: Option<u32>,
 }
 
+pub fn lead(rows: &[Row], index: usize) -> usize {
+    match rows.get(index) {
+        Some(Row::Context(..) | Row::Add(..) | Row::Del(..)) => 2,
+        _ => 0,
+    }
+}
+
 pub fn lines(
     rows: &[Row],
     colors: &[Colors],

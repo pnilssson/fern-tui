@@ -7,7 +7,9 @@ use notify_debouncer_mini::{DebounceEventResult, Debouncer, new_debouncer};
 
 use crate::Msg;
 
-pub fn start(root: &Path, messages: Sender<Msg>) -> Option<Debouncer<RecommendedWatcher>> {
+pub type Watcher = Debouncer<RecommendedWatcher>;
+
+pub fn start(root: &Path, recursive: bool, messages: Sender<Msg>) -> Option<Watcher> {
     let mut debouncer = new_debouncer(
         Duration::from_millis(250),
         move |result: DebounceEventResult| {
@@ -20,10 +22,12 @@ pub fn start(root: &Path, messages: Sender<Msg>) -> Option<Debouncer<Recommended
         },
     )
     .ok()?;
-    debouncer
-        .watcher()
-        .watch(root, RecursiveMode::Recursive)
-        .ok()?;
+    let mode = if recursive {
+        RecursiveMode::Recursive
+    } else {
+        RecursiveMode::NonRecursive
+    };
+    debouncer.watcher().watch(root, mode).ok()?;
 
     Some(debouncer)
 }

@@ -1,11 +1,12 @@
 use std::path::{Path, PathBuf};
 
-use fern_git::Context;
+use fern_git::{Context, Status};
 use ratatui::widgets::ListState;
 
 use super::{App, Focus, Mode, rel};
 use crate::entries::{self, Entry};
 use crate::preview::Preview;
+use crate::watch;
 
 #[derive(Clone, Copy)]
 pub(super) enum Step {
@@ -135,12 +136,47 @@ impl App {
     }
 
     fn set_cwd(&mut self, cwd: PathBuf) {
+        let cwd = if self.in_repo && cwd.starts_with(&self.root) {
+            cwd
+        } else {
+            self.relocate(cwd)
+        };
         self.cwd_rel = rel(&self.root, &cwd);
         self.cwd = cwd;
     }
 
+    fn relocate(&mut self, cwd: PathBuf) -> PathBuf {
+        let repo = fern_git::locate(&cwd);
+        let in_repo = repo.is_some();
+        let (root, cwd) = match repo {
+            Some(repo) => (repo.root, repo.cwd),
+            None => (cwd.clone(), cwd),
+        };
+        if root != self.root || in_repo != self.in_repo {
+            self.switch(root, in_repo);
+        }
+
+        cwd
+    }
+
+    fn switch(&mut self, root: PathBuf, in_repo: bool) {
+        self.root = root;
+        self.in_repo = in_repo;
+        self.status = Status::default();
+        self.marks.clear();
+        self.dirty_dirs.clear();
+        self.changes_state = ListState::default();
+        self.git_error = None;
+        if !in_repo {
+            self.mode = Mode::Files;
+        }
+
+        self.watcher = watch::start(&self.root, in_repo, self.messages.clone());
+        self.refresh_git();
+    }
+
     pub(super) fn go_up(&mut self) {
-        if self.mode != Mode::Files || self.cwd == self.root {
+        if self.mode != Mode::Files {
             return;
         }
 
@@ -216,5 +252,47 @@ impl App {
         if let Some(target) = target {
             self.preview_scroll = target;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+    use std::sync::mpsc;
+
+    use super::super::App;
+
+    fn select(app: &mut App, name: &str) {
+        let index = app.entries.iter().position(|entry| entry.name == name);
+        app.files_state.select(index);
+    }
+
+    #[test]
+    fn walking_between_a_plain_folder_and_a_repo_switches_context() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().canonicalize().unwrap();
+        let repo = base.join("repo");
+        std::fs::create_dir(&repo).unwrap();
+        let status = Command::new("git")
+            .args(["init", "-q"])
+            .current_dir(&repo)
+            .status()
+            .unwrap();
+        assert!(status.success());
+
+        let (requests, _worker) = mpsc::channel();
+        let (messages, _inbox) = mpsc::channel();
+        let mut app = App::new(base.clone(), base.clone(), false, requests, messages);
+        assert!(!app.in_repo);
+
+        select(&mut app, "repo");
+        app.open();
+        assert!(app.in_repo);
+        assert_eq!(app.root, repo);
+
+        app.go_up();
+        assert!(!app.in_repo);
+        assert_eq!(app.root, base);
+        assert_eq!(app.cwd, base);
     }
 }

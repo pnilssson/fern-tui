@@ -7,7 +7,6 @@ use crate::preview::Preview;
 use fern_git::Row;
 
 const THUMB: &str = "┃";
-const TICK: &str = "─";
 
 fn offset(index: usize, len: usize, height: usize) -> u16 {
     let y = (index * height / len).min(height.saturating_sub(1));
@@ -64,14 +63,14 @@ pub fn draw(
     };
 
     for (index, row) in diff.rows.iter().enumerate() {
-        let color = match row {
-            Row::Add(..) => Color::Green,
-            Row::Del(..) => Color::Red,
+        let (symbol, color) = match row {
+            Row::Add(..) => ("+", Color::Green),
+            Row::Del(..) => ("-", Color::Red),
             _ => continue,
         };
         let y = inner.y + offset(index, len, height);
         buffer[(x, y)]
-            .set_symbol(TICK)
+            .set_symbol(symbol)
             .set_style(Style::new().fg(color));
     }
 }

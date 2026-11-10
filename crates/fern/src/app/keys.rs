@@ -1,10 +1,11 @@
 use ratatui::crossterm::event::{
-    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseEvent, MouseEventKind,
+    KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
 use ratatui::layout::Position;
 
+use super::copy::OPTIONS;
 use super::nav::Step;
-use super::{App, Focus, Mode};
+use super::{App, Chord, Focus, Mode};
 
 const STEP: usize = 3;
 const SEEK: usize = 5;
@@ -15,10 +16,31 @@ impl App {
             return;
         }
 
+        self.notice = None;
+        self.selection = None;
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        if ctrl && key.code == KeyCode::Char('c') {
+            self.quit = true;
+
+            return;
+        }
+
+        match self.chord.take() {
+            Some(Chord::Copy) => {
+                if !ctrl {
+                    self.copy_key(key.code);
+                }
+
+                return;
+            }
+            Some(Chord::Help) => return,
+            None => {}
+        }
+
         match key.code {
-            KeyCode::Char('c') if ctrl => self.quit = true,
             KeyCode::Char('q') => self.quit = true,
+            KeyCode::Char('c') => self.chord = Some(Chord::Copy),
+            KeyCode::Char('?') => self.chord = Some(Chord::Help),
             KeyCode::Char('1') => self.set_mode(Mode::Files),
             KeyCode::Char('2') => self.set_mode(Mode::Changes),
             KeyCode::Char('0') => self.read(),
@@ -32,6 +54,15 @@ impl App {
             KeyCode::Char('G') | KeyCode::End => self.bottom(),
             _ if self.focus == Focus::Preview => self.read_key(key.code, ctrl),
             _ => self.list_key(key.code, ctrl),
+        }
+    }
+
+    fn copy_key(&mut self, code: KeyCode) {
+        let KeyCode::Char(key) = code else {
+            return;
+        };
+        if let Some((_, what, _)) = OPTIONS.iter().find(|(option, ..)| *option == key) {
+            self.copy(*what);
         }
     }
 
@@ -94,6 +125,9 @@ impl App {
             .preview_area
             .contains(Position::new(mouse.column, mouse.row));
         match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => self.select_press(mouse.column, mouse.row),
+            MouseEventKind::Drag(MouseButton::Left) => self.select_drag(mouse.column, mouse.row),
+            MouseEventKind::Up(MouseButton::Left) => self.select_release(),
             MouseEventKind::ScrollUp if over_preview => self.scroll_up(STEP),
             MouseEventKind::ScrollDown if over_preview => self.scroll_down(STEP),
             MouseEventKind::ScrollUp => self.move_sel(Step::Up(1)),

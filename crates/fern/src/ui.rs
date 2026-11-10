@@ -11,9 +11,9 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Paragraph};
+use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
 
-use crate::app::{App, Focus, Mode};
+use crate::app::{App, Mode};
 
 const ACCENT: Color = Color::Cyan;
 const MAX_CELL: usize = 2000;
@@ -40,6 +40,42 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     };
     app.preview_area = main;
     preview::draw(frame, app, main, &name.unwrap_or_default());
+
+    if let Some((title, rows)) = app.menu() {
+        menu(frame, body, title, &rows);
+    }
+}
+
+fn menu(frame: &mut Frame, body: Rect, title_text: &str, rows: &[(String, &str)]) {
+    let width = rows
+        .iter()
+        .map(|(keys, _)| keys.chars().count())
+        .max()
+        .unwrap_or_default();
+    let lines: Vec<Line> = rows
+        .iter()
+        .map(|(keys, help)| {
+            Line::from(vec![
+                Span::styled(
+                    format!(" {keys:width$}  "),
+                    Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
+                ),
+                Span::raw((*help).to_owned()),
+            ])
+        })
+        .collect();
+    let height = u16::try_from(lines.len() + 2).unwrap_or(u16::MAX);
+    let area = Rect {
+        y: body.bottom().saturating_sub(height).max(body.y),
+        height: height.min(body.height),
+        ..body
+    };
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(pane(title(title_text, area.width), true)),
+        area,
+    );
 }
 
 fn footer_line(app: &App) -> Paragraph<'static> {
@@ -50,13 +86,14 @@ fn footer_line(app: &App) -> Paragraph<'static> {
         ));
     }
 
-    let hints = match app.mode {
-        _ if app.focus == Focus::Preview => {
-            "↑↓ scroll  g/G top/bottom  n/N change  f full/diff  ← back  q quit"
-        }
-        Mode::Files => "←↑↓→ move/read  g/G top/bottom  . hidden  R refresh  q quit",
-        Mode::Changes => "↑↓ move  → read  ⏎ reveal  f full/diff  n/N change  q quit",
-    };
+    if let Some(notice) = app.notice() {
+        return Paragraph::new(Span::styled(
+            format!(" {notice}"),
+            Style::new().fg(Color::Green),
+        ));
+    }
+
+    let hints = "? keys  q quit";
 
     let mut spans = vec![Span::styled(
         format!(" {hints}"),

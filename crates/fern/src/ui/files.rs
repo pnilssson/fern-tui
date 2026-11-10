@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use fern_git::Change;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -11,14 +13,18 @@ use crate::entries::Entry;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let focused = app.mode == Mode::Files && app.focus == Focus::List;
-    let cwd = if app.cwd_rel.is_empty() {
-        String::new()
-    } else {
-        format!("  {}", app.cwd_rel)
-    };
+    let cwd = shown(&app.cwd, std::env::var_os("HOME").as_deref().map(Path::new));
     let rows = rows(app, &app.entries, &app.cwd_rel, list::room(area));
-    let block = pane(title(&format!("[1] Files{cwd}"), area.width), focused);
+    let block = pane(title(&format!("[1] {cwd}"), area.width), focused);
     list::draw(frame, area, block, rows, &mut app.files_state, focused);
+}
+
+fn shown(cwd: &Path, home: Option<&Path>) -> String {
+    match home.and_then(|home| cwd.strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".to_owned(),
+        Some(rest) => format!("~/{}", rest.display()),
+        None => cwd.display().to_string(),
+    }
 }
 
 pub fn rows(app: &App, entries: &[Entry], base: &str, width: usize) -> Vec<Vec<Span<'static>>> {
@@ -80,5 +86,22 @@ fn letter(code: char) -> &'static str {
         'R' => "R",
         'C' => "C",
         _ => "M",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::shown;
+
+    #[test]
+    fn the_home_folder_is_abbreviated() {
+        let home = Some(Path::new("/Users/me"));
+
+        assert_eq!(shown(Path::new("/Users/me"), home), "~");
+        assert_eq!(shown(Path::new("/Users/me/repos/app"), home), "~/repos/app");
+        assert_eq!(shown(Path::new("/etc"), home), "/etc");
+        assert_eq!(shown(Path::new("/etc"), None), "/etc");
     }
 }
