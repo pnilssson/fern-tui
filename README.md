@@ -35,6 +35,7 @@ Copying paths and selected text needs `pbcopy` on macOS, `clip` on Windows, or `
 
 | Variable | Effect |
 | --- | --- |
+| `FERN_ROUNDED=1` | Rounds the selection. Needs a font with Powerline symbols, such as a Nerd Font. |
 | `FERN_NO_UPDATE_CHECK=1` | Turns off the daily update check. |
 
 ## Development
