@@ -1,0 +1,61 @@
+name: main
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: $/.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install
+      - name: Bump the patch version if it is already released
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
+          if gh release view "v$version" > /dev/null 2>&1; then
+            IFS=. read -r major minor patch <<< "$version"
+            next="$major.$minor.$((patch + 1))"
+            sed -i.bak "s/^version = \"$version\"$/version = \"$next\"/" Cargo.toml
+            rm Cargo.toml.bak
+            version="$next"
+            cargo update --workspace
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "Release v$version"
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" HEAD:main
+          fi
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+      - name: Run the release and wait for it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          since=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          gh workflow run release.yml --ref main -f tag="$TAG"
+          for _ in $(seq 1 12); do
+            sleep 5
+            id=$(gh run list --workflow release.yml --event workflow_dispatch --created ">=$since" --json databaseId --jq '.[0].databaseId')
+            [ -n "$id" ] && break
+          done
+          gh run watch "$id" --exit-status

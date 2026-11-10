@@ -3,6 +3,7 @@ name = "fern"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 publish.workspace = true
 description = "A small, fast terminal browser for a git repo and its changes"
 
@@ -13,6 +14,9 @@ ratatui.workspace = true
 similar.workspace = true
 two-face.workspace = true
 unicode-width.workspace = true
+
+[package.metadata.dist]
+dist = true
 
 [lints]
 workspace = true

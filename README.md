@@ -10,6 +10,22 @@ Built with Rust and ratatui. Code is syntax highlighted with the terminal's own 
 
 Set `FERN_ROUNDED=1` to round the selection. It needs a font with the Powerline symbols, such as a Nerd Font.
 
+## Install
+
+macOS and Linux:
+
+```sh
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/pnilssson/fern-tui/releases/latest/download/fern-installer.sh | sh
+```
+
+Windows:
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://github.com/pnilssson/fern-tui/releases/latest/download/fern-installer.ps1 | iex"
+```
+
+Every push to `main` that passes CI is released with the next patch version.
+
 ## Development
 
 Install the toolchain from `rust-toolchain.toml`, then:
