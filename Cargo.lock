@@ -485,7 +485,7 @@ dependencies = [
 
 [[package]]
 name = "fern"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "fern-git",
  "image",
@@ -500,7 +500,7 @@ dependencies = [
 
 [[package]]
 name = "fern-git"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "tempfile",
  "thiserror 2.0.21",
