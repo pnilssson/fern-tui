@@ -4,6 +4,8 @@ A small, fast terminal browser for folders and git changes, inspired by [yazi](h
 
 Browse any folder with a syntax highlighted preview next to the list. Inside a git repo a second pane lists the changed files, and the preview shows each one as the full file with the changes marked, or as a plain diff. The view follows the files on disk, so it updates as they change.
 
+![fern showing a diff next to the list of changed files](docs/screenshot.png)
+
 ## Install
 
 macOS and Linux:
