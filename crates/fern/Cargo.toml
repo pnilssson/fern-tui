@@ -9,8 +9,10 @@ description = "A small, fast terminal browser for a git repo and its changes"
 
 [dependencies]
 fern-git.workspace = true
+image.workspace = true
 notify-debouncer-mini.workspace = true
 ratatui.workspace = true
+ratatui-image.workspace = true
 similar.workspace = true
 two-face.workspace = true
 unicode-width.workspace = true

@@ -4,6 +4,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, Paragraph};
+use ratatui_image::{Resize, StatefulImage};
 
 use super::wrap::wrap;
 use super::{center, clean, diff, dim, files, pane, title};
@@ -84,12 +85,21 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
         app.focus == Focus::Preview,
     );
 
+    if let Preview::Image(protocol) = &mut app.preview {
+        let image = StatefulImage::default().resize(Resize::Fit(None));
+        frame.render_stateful_widget(image, inner, protocol.as_mut());
+        app.preview_inner = inner;
+        app.preview_rows = Vec::new();
+
+        return;
+    }
+
     let skip = app.preview_scroll;
     let height = usize::from(inner.height);
     let cols = usize::from(inner.width);
     let selection = app.selection;
     let rows = match &app.preview {
-        Preview::Empty => Vec::new(),
+        Preview::Empty | Preview::Image(_) => Vec::new(),
         Preview::Message(text) => {
             center(frame, inner, text);
             Vec::new()

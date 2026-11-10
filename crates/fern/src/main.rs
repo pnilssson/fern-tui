@@ -17,6 +17,9 @@ use preview::Preview;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
 use ratatui::crossterm::execute;
+use ratatui_image::errors::Errors;
+use ratatui_image::picker::Picker;
+use ratatui_image::thread::ResizeResponse;
 
 use app::App;
 
@@ -25,6 +28,7 @@ pub enum Msg {
     Changed,
     Status(PathBuf, Result<Status, fern_git::Error>),
     Preview(u64, Preview),
+    Resized(u64, Box<Result<ResizeResponse, Errors>>),
     Update(String),
 }
 
@@ -37,9 +41,12 @@ fn main() -> io::Result<()> {
         None => (start.clone(), start, false),
     };
 
+    let mut terminal = ratatui::try_init()?;
+    let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
+
     let (messages, inbox) = mpsc::channel();
     let (requests, worker) = mpsc::channel();
-    preview::spawn(worker, messages.clone());
+    preview::spawn(worker, messages.clone(), picker);
 
     let input = messages.clone();
     thread::spawn(move || {
@@ -52,7 +59,6 @@ fn main() -> io::Result<()> {
     update::spawn(messages.clone());
 
     let mut app = App::new(root, cwd, in_repo, requests, messages);
-    let mut terminal = ratatui::try_init()?;
     execute!(io::stdout(), EnableMouseCapture)?;
     let result = run(&mut terminal, &mut app, &inbox);
     execute!(io::stdout(), DisableMouseCapture)?;

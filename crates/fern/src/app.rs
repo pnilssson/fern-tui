@@ -209,6 +209,7 @@ impl App {
             Msg::Changed => self.refresh_all(),
             Msg::Status(root, result) => self.apply_status(&root, result),
             Msg::Preview(id, preview) => self.apply_preview(id, preview),
+            Msg::Resized(id, result) => self.apply_resized(id, *result),
             Msg::Update(version) => self.update = Some(version),
         }
     }

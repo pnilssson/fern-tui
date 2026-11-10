@@ -1,10 +1,14 @@
-use std::fs::File;
+use std::ffi::OsStr;
+use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread;
 
 use fern_git::{Change, Context, Diff};
+use image::ImageReader;
+use ratatui_image::picker::Picker;
+use ratatui_image::thread::{ResizeRequest, ThreadProtocol};
 
 use crate::Msg;
 use crate::entries::{self, Entry};
@@ -13,6 +17,8 @@ use crate::highlight::{self, Colors};
 const MAX_BYTES: u64 = 256 * 1024;
 const MAX_LINES: usize = 3000;
 const MAX_ENTRIES: usize = 1000;
+const MAX_IMAGE_BYTES: u64 = 32 << 20;
+const IMAGES: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "bmp"];
 
 pub enum Preview {
     Empty,
@@ -23,6 +29,7 @@ pub enum Preview {
         truncated: bool,
     },
     Dir(Vec<Entry>),
+    Image(Box<ThreadProtocol>),
     Diff {
         diff: Diff,
         colors: Vec<Colors>,
@@ -35,7 +42,7 @@ impl Preview {
             Preview::Text { lines, .. } => lines.len(),
             Preview::Diff { diff, .. } => diff.rows.len(),
             Preview::Dir(entries) => entries.len(),
-            Preview::Empty | Preview::Message(_) => 0,
+            Preview::Empty | Preview::Message(_) | Preview::Image(_) => 0,
         }
     }
 }
@@ -51,7 +58,53 @@ pub struct Request {
     pub target: Target,
 }
 
-pub fn spawn(requests: Receiver<Request>, messages: Sender<Msg>) {
+struct Pictures {
+    picker: Picker,
+    messages: Sender<Msg>,
+}
+
+impl Pictures {
+    fn load(&self, id: u64, path: &Path) -> Preview {
+        let size = fs::metadata(path).map_or(0, |meta| meta.len());
+        if size > MAX_IMAGE_BYTES {
+            return Preview::Message(format!("Image too large, {}", size_text(size)));
+        }
+
+        let decoded = ImageReader::open(path)
+            .map_err(|error| error.to_string())
+            .and_then(|reader| reader.decode().map_err(|error| error.to_string()));
+        let image = match decoded {
+            Ok(image) => image,
+            Err(error) => return Preview::Message(error),
+        };
+
+        let (resizes, encoder) = mpsc::channel::<ResizeRequest>();
+        let messages = self.messages.clone();
+        thread::spawn(move || {
+            while let Ok(request) = encoder.recv() {
+                let done = Box::new(request.resize_encode());
+                if messages.send(Msg::Resized(id, done)).is_err() {
+                    break;
+                }
+            }
+        });
+        let protocol = self.picker.new_resize_protocol(image);
+
+        Preview::Image(Box::new(ThreadProtocol::new(resizes, Some(protocol))))
+    }
+}
+
+fn is_image(path: &Path) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .is_some_and(|ext| IMAGES.iter().any(|image| image.eq_ignore_ascii_case(ext)))
+}
+
+pub fn spawn(requests: Receiver<Request>, messages: Sender<Msg>, picker: Picker) {
+    let pictures = Pictures {
+        picker,
+        messages: messages.clone(),
+    };
     thread::spawn(move || {
         while let Ok(mut request) = requests.recv() {
             while let Ok(newer) = requests.try_recv() {
@@ -59,9 +112,17 @@ pub fn spawn(requests: Receiver<Request>, messages: Sender<Msg>) {
             }
 
             let preview = match &request.target {
+                Target::File(path) if is_image(path) => pictures.load(request.id, path),
                 Target::File(path) => file(path),
                 Target::Dir(path, hidden) => dir(path, *hidden),
-                Target::Change(root, change, context) => change_diff(root, change, *context),
+                Target::Change(root, change, context) => {
+                    let path = root.join(&change.path);
+                    if is_image(&path) && path.is_file() {
+                        pictures.load(request.id, &path)
+                    } else {
+                        change_diff(root, change, *context)
+                    }
+                }
             };
             if messages.send(Msg::Preview(request.id, preview)).is_err() {
                 break;

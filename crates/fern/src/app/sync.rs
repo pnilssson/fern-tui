@@ -2,6 +2,8 @@ use std::path::Path;
 use std::thread;
 
 use fern_git::{Error, Status};
+use ratatui_image::errors::Errors;
+use ratatui_image::thread::ResizeResponse;
 
 use super::{App, Mode, Refresh};
 use crate::Msg;
@@ -103,6 +105,16 @@ impl App {
         self.preview_scroll = self
             .preview_scroll
             .min(self.preview.len().saturating_sub(1));
+    }
+
+    pub(super) fn apply_resized(&mut self, id: u64, result: Result<ResizeResponse, Errors>) {
+        if id != self.latest {
+            return;
+        }
+
+        if let (Preview::Image(protocol), Ok(done)) = (&mut self.preview, result) {
+            protocol.update_resized_protocol(done);
+        }
     }
 
     pub(super) fn request_preview(&mut self) {
