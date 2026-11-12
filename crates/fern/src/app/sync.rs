@@ -74,14 +74,14 @@ impl App {
             .collect();
         self.status = status;
         self.git_error = None;
+        self.changes = self.visible_changes();
 
-        let len = self.status.changes.len();
+        let len = self.changes.len();
         let index = kept
             .and_then(|path| {
-                self.status
-                    .changes
+                self.changes
                     .iter()
-                    .position(|change| change.path == path)
+                    .position(|(change, _)| change.path == path)
             })
             .or_else(|| previous.map(|index| index.min(len.saturating_sub(1))));
         self.changes_state.select(if len == 0 {

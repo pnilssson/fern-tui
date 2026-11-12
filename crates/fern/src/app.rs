@@ -1,4 +1,5 @@
 mod copy;
+mod filter;
 mod help;
 mod keys;
 mod nav;
@@ -11,6 +12,7 @@ use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
 use fern_git::{Change, Context, Status};
+use nucleo_matcher::{Config, Matcher};
 use ratatui::crossterm::event::Event;
 use ratatui::layout::Rect;
 use ratatui::widgets::ListState;
@@ -34,6 +36,7 @@ pub enum Focus {
     Preview,
 }
 
+pub use filter::Filter;
 pub use select::{Selection, Visual};
 
 struct Notice {
@@ -68,9 +71,12 @@ pub struct App {
     pub update: Option<String>,
 
     pub entries: Vec<Entry>,
+    pub filter: Option<Filter>,
     pub files_state: ListState,
 
     pub status: Status,
+    pub changes: Vec<(Change, Vec<u32>)>,
+    pub changes_filter: Option<Filter>,
     pub git_error: Option<String>,
     pub marks: HashMap<String, Change>,
     pub dirty_dirs: HashSet<String>,
@@ -84,6 +90,8 @@ pub struct App {
     pub preview_rows: Vec<Visual>,
     pub selection: Option<Selection>,
 
+    listing: Vec<Entry>,
+    matcher: Matcher,
     notice: Option<Notice>,
     hidden: bool,
     chord: Option<Chord>,
@@ -126,8 +134,11 @@ impl App {
             quit: false,
             update: None,
             entries: Vec::new(),
+            filter: None,
             files_state: ListState::default(),
             status: Status::default(),
+            changes: Vec::new(),
+            changes_filter: None,
             git_error: None,
             marks: HashMap::new(),
             dirty_dirs: HashSet::new(),
@@ -139,6 +150,8 @@ impl App {
             preview_inner: Rect::default(),
             preview_rows: Vec::new(),
             selection: None,
+            listing: Vec::new(),
+            matcher: Matcher::new(Config::DEFAULT.match_paths()),
             notice: None,
             hidden: false,
             chord: None,

@@ -25,6 +25,12 @@ impl App {
             return;
         }
 
+        if self.typing() {
+            self.filter_key(key);
+
+            return;
+        }
+
         match self.chord.take() {
             Some(Chord::Copy) => {
                 if !ctrl {
@@ -45,7 +51,9 @@ impl App {
             KeyCode::Char('2') => self.set_mode(Mode::Changes),
             KeyCode::Char('0') => self.read(),
             KeyCode::Tab => self.toggle_mode(),
-            KeyCode::Char('f') if !ctrl => self.toggle_context(),
+            KeyCode::Char('f') if !ctrl => self.start_filter(),
+            KeyCode::Char('d') if !ctrl => self.toggle_context(),
+            KeyCode::Esc if self.focus == Focus::List && self.filtering() => self.clear_filter(),
             KeyCode::Char('R') => self.refresh_all(),
             KeyCode::Char('.') => self.toggle_hidden(),
             KeyCode::Char('n') => self.jump_hunk(true),

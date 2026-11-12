@@ -5,6 +5,7 @@ use std::path::Path;
 pub struct Entry {
     pub name: String,
     pub dir: bool,
+    pub hits: Vec<u32>,
 }
 
 pub fn read(path: &Path, hidden: bool) -> Vec<Entry> {
@@ -22,6 +23,7 @@ pub fn read(path: &Path, hidden: bool) -> Vec<Entry> {
             Some(Entry {
                 name,
                 dir: item.path().is_dir(),
+                hits: Vec::new(),
             })
         })
         .collect();

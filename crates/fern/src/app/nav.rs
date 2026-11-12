@@ -56,7 +56,7 @@ impl App {
     pub(super) fn move_sel(&mut self, step: Step) {
         let (len, state) = match self.mode {
             Mode::Files => (self.entries.len(), &mut self.files_state),
-            Mode::Changes => (self.status.changes.len(), &mut self.changes_state),
+            Mode::Changes => (self.changes.len(), &mut self.changes_state),
         };
         if len == 0 {
             return;
@@ -100,7 +100,8 @@ impl App {
     pub fn selected_change(&self) -> Option<&fern_git::Change> {
         self.changes_state
             .selected()
-            .and_then(|index| self.status.changes.get(index))
+            .and_then(|index| self.changes.get(index))
+            .map(|(change, _)| change)
     }
 
     pub(super) fn remember(&mut self) {
@@ -115,10 +116,15 @@ impl App {
     }
 
     pub(super) fn load_dir(&mut self, select: Option<&str>) {
-        self.entries = entries::read(&self.cwd, self.hidden);
+        self.listing = entries::read(&self.cwd, self.hidden);
         let wanted = select
             .map(str::to_owned)
             .or_else(|| self.memory.get(&self.cwd).cloned());
+        self.apply(wanted);
+    }
+
+    pub(super) fn apply(&mut self, wanted: Option<String>) {
+        self.entries = self.visible();
         let index =
             wanted.and_then(|name| self.entries.iter().position(|entry| entry.name == name));
         self.files_state = ListState::default();
@@ -130,12 +136,28 @@ impl App {
         self.request_preview();
     }
 
+    pub(super) fn apply_changes(&mut self, wanted: Option<String>) {
+        self.changes = self.visible_changes();
+        let index = wanted.and_then(|path| {
+            self.changes
+                .iter()
+                .position(|(change, _)| change.path == path)
+        });
+        self.changes_state = ListState::default();
+        if !self.changes.is_empty() {
+            self.changes_state.select(Some(index.unwrap_or(0)));
+        }
+
+        self.request_preview();
+    }
+
     pub(super) fn reload(&mut self) {
         let name = self.selected_entry().map(|entry| entry.name.clone());
         self.load_dir(name.as_deref());
     }
 
     fn set_cwd(&mut self, cwd: PathBuf) {
+        self.filter = None;
         let cwd = if self.in_repo && cwd.starts_with(&self.root) {
             cwd
         } else {
@@ -163,6 +185,8 @@ impl App {
         self.root = root;
         self.in_repo = in_repo;
         self.status = Status::default();
+        self.changes.clear();
+        self.changes_filter = None;
         self.marks.clear();
         self.dirty_dirs.clear();
         self.changes_state = ListState::default();
