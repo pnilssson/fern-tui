@@ -2,12 +2,13 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::Sender;
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::Msg;
 
 const URL: &str = "https://api.github.com/repos/pnilssson/fern-tui/releases/latest";
 const MAX_AGE: u64 = 24 * 60 * 60;
+const RECHECK: Duration = Duration::from_hours(1);
 
 pub fn spawn(messages: Sender<Msg>) {
     if std::env::var_os("FERN_NO_UPDATE_CHECK").is_some() {
@@ -15,11 +16,16 @@ pub fn spawn(messages: Sender<Msg>) {
     }
 
     thread::spawn(move || {
-        let Some(latest) = latest() else {
-            return;
-        };
-        if newer(env!("CARGO_PKG_VERSION"), &latest) {
-            let _ = messages.send(Msg::Update(latest));
+        loop {
+            if let Some(latest) = latest()
+                && newer(env!("CARGO_PKG_VERSION"), &latest)
+            {
+                let _ = messages.send(Msg::Update(latest));
+
+                return;
+            }
+
+            thread::sleep(RECHECK);
         }
     });
 }
