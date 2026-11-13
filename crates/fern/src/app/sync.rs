@@ -96,12 +96,18 @@ impl App {
             return;
         }
 
-        if self.wanted_key != self.shown_key {
-            self.preview_scroll = 0;
+        let fresh = self.wanted_key != self.shown_key;
+        if fresh {
             self.selection = None;
             self.shown_key.clone_from(&self.wanted_key);
         }
         self.preview = preview;
+        if fresh {
+            self.preview_scroll = match &self.preview {
+                Preview::Diff { diff, .. } => diff.hunks.first().copied().unwrap_or(0),
+                _ => 0,
+            };
+        }
         self.preview_scroll = self
             .preview_scroll
             .min(self.preview.len().saturating_sub(1));
