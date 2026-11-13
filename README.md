@@ -26,7 +26,7 @@ Update with `fern-update`. fern checks GitHub for a newer release once a day and
 
 Run `fern` to browse the current folder, or `fern PATH` to start somewhere else. Press `?` to see every key.
 
-- `1` Files: move with the arrow keys. Left goes up a folder, right goes into a folder or opens a file in the preview. `f` filters the current folder (or, in Changes, the changed files) as you type: fuzzy, smart-case, ranked, with the matches underlined. Enter keeps the filter, Esc clears it.
+- `1` Files: move with the arrow keys. Left goes up a folder, right goes into a folder or opens a file in the preview. `f` filters the current folder (or, in Changes, the changed files) as you type: fuzzy, smart-case, ranked, with the matches underlined. Up and down move through the results, right or Enter opens the selected one and ends the filter, and Esc clears it.
 - `2` Changes: the changed files of the current repo. Enter reveals a file in Files, and `d` switches between the full file and only the diff.
 
 Copying paths and selected text needs `pbcopy` on macOS, `clip` on Windows, or `wl-copy`, `xclip` or `xsel` on Linux.

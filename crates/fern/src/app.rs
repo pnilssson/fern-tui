@@ -36,7 +36,6 @@ pub enum Focus {
     Preview,
 }
 
-pub use filter::Filter;
 pub use select::{Selection, Visual};
 
 struct Notice {
@@ -71,12 +70,12 @@ pub struct App {
     pub update: Option<String>,
 
     pub entries: Vec<Entry>,
-    pub filter: Option<Filter>,
+    pub filter: Option<String>,
     pub files_state: ListState,
 
     pub status: Status,
     pub changes: Vec<(Change, Vec<u32>)>,
-    pub changes_filter: Option<Filter>,
+    pub changes_filter: Option<String>,
     pub git_error: Option<String>,
     pub marks: HashMap<String, Change>,
     pub dirty_dirs: HashSet<String>,

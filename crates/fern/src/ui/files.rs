@@ -8,7 +8,7 @@ use ratatui::text::{Line, Span};
 
 use super::list::{self, aligned, clip_end};
 use super::{pane, title};
-use crate::app::{App, Filter, Focus, Mode};
+use crate::app::{App, Focus, Mode};
 use crate::entries::Entry;
 
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
@@ -67,20 +67,15 @@ pub fn rows(app: &App, entries: &[Entry], base: &str, width: usize) -> Vec<Vec<S
         .collect()
 }
 
-pub fn query(filter: &Filter) -> Line<'static> {
-    let mut spans = vec![Span::styled(
-        format!(" /{}", filter.query),
-        Style::new().add_modifier(Modifier::BOLD),
-    )];
-    if filter.typing {
-        spans.push(Span::styled(
-            " ",
-            Style::new().add_modifier(Modifier::REVERSED),
-        ));
-    }
-    spans.push(Span::raw(" "));
-
-    Line::from(spans)
+pub fn query(query: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!(" /{query}"),
+            Style::new().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::new().add_modifier(Modifier::REVERSED)),
+        Span::raw(" "),
+    ])
 }
 
 pub fn name_spans(text: &str, hits: &[u32], style: Style) -> Vec<Span<'static>> {

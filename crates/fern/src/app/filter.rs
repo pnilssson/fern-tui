@@ -10,11 +10,6 @@ use fern_git::Change;
 
 use crate::entries::Entry;
 
-pub struct Filter {
-    pub query: String,
-    pub typing: bool,
-}
-
 fn rank<T: Clone>(
     matcher: &mut Matcher,
     items: &[T],
@@ -43,10 +38,8 @@ fn rank<T: Clone>(
         .collect()
 }
 
-fn text(filter: Option<&Filter>) -> Option<String> {
-    filter
-        .map(|filter| filter.query.clone())
-        .filter(|query| !query.is_empty())
+fn text(filter: Option<&String>) -> Option<String> {
+    filter.filter(|query| !query.is_empty()).cloned()
 }
 
 fn delete_word(query: &mut String) {
@@ -55,26 +48,18 @@ fn delete_word(query: &mut String) {
 }
 
 impl App {
-    fn slot(&mut self) -> &mut Option<Filter> {
+    fn slot(&mut self) -> &mut Option<String> {
         match self.mode {
             Mode::Files => &mut self.filter,
             Mode::Changes => &mut self.changes_filter,
         }
     }
 
-    fn active(&self) -> Option<&Filter> {
-        match self.mode {
-            Mode::Files => self.filter.as_ref(),
-            Mode::Changes => self.changes_filter.as_ref(),
-        }
-    }
-
-    pub(super) fn typing(&self) -> bool {
-        self.active().is_some_and(|filter| filter.typing)
-    }
-
     pub(super) fn filtering(&self) -> bool {
-        self.active().is_some()
+        match self.mode {
+            Mode::Files => self.filter.is_some(),
+            Mode::Changes => self.changes_filter.is_some(),
+        }
     }
 
     pub(super) fn visible(&mut self) -> Vec<Entry> {
@@ -121,15 +106,7 @@ impl App {
 
     pub(super) fn start_filter(&mut self) {
         self.focus = Focus::List;
-        let query = self
-            .slot()
-            .take()
-            .map(|filter| filter.query)
-            .unwrap_or_default();
-        *self.slot() = Some(Filter {
-            query,
-            typing: true,
-        });
+        self.slot().get_or_insert_default();
     }
 
     pub(super) fn clear_filter(&mut self) {
@@ -142,7 +119,18 @@ impl App {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         match key.code {
             KeyCode::Esc => self.clear_filter(),
-            KeyCode::Enter => self.keep_filter(),
+            KeyCode::Right => {
+                self.clear_filter();
+                self.open();
+            }
+            KeyCode::Enter => {
+                self.clear_filter();
+                if self.mode == Mode::Changes {
+                    self.reveal();
+                } else {
+                    self.open();
+                }
+            }
             KeyCode::Up => self.move_sel(Step::Up(1)),
             KeyCode::Down => self.move_sel(Step::Down(1)),
             KeyCode::Char('p' | 'k') if ctrl => self.move_sel(Step::Up(1)),
@@ -150,7 +138,7 @@ impl App {
             KeyCode::Char('u') if ctrl => self.edit(String::clear),
             KeyCode::Char('w') if ctrl => self.edit(delete_word),
             KeyCode::Backspace => {
-                if self.active().is_some_and(|filter| filter.query.is_empty()) {
+                if self.slot().as_ref().is_some_and(String::is_empty) {
                     self.clear_filter();
                 } else {
                     self.edit(|query| {
@@ -163,23 +151,12 @@ impl App {
         }
     }
 
-    fn keep_filter(&mut self) {
-        let Some(filter) = self.slot() else {
-            return;
-        };
-        if filter.query.is_empty() {
-            *self.slot() = None;
-        } else {
-            filter.typing = false;
-        }
-    }
-
     fn edit(&mut self, change: impl FnOnce(&mut String)) {
-        let Some(filter) = self.slot() else {
+        let Some(query) = self.slot() else {
             return;
         };
 
-        change(&mut filter.query);
+        change(query);
         self.refilter(None);
     }
 }
@@ -224,5 +201,31 @@ mod tests {
         let found = run(&["src/app/main.rs", "docs/main.md"], "appmain");
 
         assert_eq!(names(&found), ["src/app/main.rs"]);
+    }
+
+    #[test]
+    fn right_arrow_ends_the_filter_and_enters_the_folder() {
+        use std::sync::mpsc;
+
+        use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        use crate::app::App;
+
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path().canonicalize().unwrap();
+        std::fs::create_dir_all(base.join("docs")).unwrap();
+        std::fs::create_dir_all(base.join("src")).unwrap();
+        let (requests, _worker) = mpsc::channel();
+        let (messages, _inbox) = mpsc::channel();
+        let mut app = App::new(base.clone(), base.clone(), false, requests, messages);
+
+        for code in [KeyCode::Char('f'), KeyCode::Char('s'), KeyCode::Char('r')] {
+            app.key(KeyEvent::new(code, KeyModifiers::NONE));
+        }
+        assert_eq!(app.entries.len(), 1);
+        app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+
+        assert_eq!(app.cwd, base.join("src"));
+        assert!(app.filter.is_none());
     }
 }
