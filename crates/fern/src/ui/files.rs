@@ -1,6 +1,7 @@
+use std::collections::HashMap;
 use std::path::Path;
 
-use fern_git::Change;
+use fern_git::{Change, Summary};
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -14,7 +15,13 @@ use crate::entries::Entry;
 pub fn draw(frame: &mut Frame, app: &mut App, area: Rect) {
     let focused = app.mode == Mode::Files && app.focus == Focus::List;
     let cwd = shown(&app.cwd, std::env::var_os("HOME").as_deref().map(Path::new));
-    let rows = rows(app, &app.entries, &app.cwd_rel, list::room(area));
+    let rows = rows(
+        app,
+        &app.entries,
+        &app.cwd_rel,
+        &app.repos,
+        list::room(area),
+    );
     let mut block = pane(title(&format!("[1] {cwd}"), area.width), focused);
     if let Some(filter) = &app.filter {
         block = block.title_bottom(query(filter));
@@ -30,7 +37,13 @@ fn shown(cwd: &Path, home: Option<&Path>) -> String {
     }
 }
 
-pub fn rows(app: &App, entries: &[Entry], base: &str, width: usize) -> Vec<Vec<Span<'static>>> {
+pub fn rows(
+    app: &App,
+    entries: &[Entry],
+    base: &str,
+    repos: &HashMap<String, Summary>,
+    width: usize,
+) -> Vec<Vec<Span<'static>>> {
     entries
         .iter()
         .map(|entry| {
@@ -54,17 +67,50 @@ pub fn rows(app: &App, entries: &[Entry], base: &str, width: usize) -> Vec<Vec<S
             } else {
                 app.marks.get(&rel).map(mark)
             };
+            let right = repos
+                .get(&entry.name)
+                .map_or_else(|| mark.into_iter().collect(), repo);
 
-            let reserved = if mark.is_some() { 2 } else { 0 };
+            let reserved = if right.is_empty() {
+                0
+            } else {
+                list::width(&right) + 1
+            };
             let name = clip_end(&label, width.saturating_sub(reserved));
 
-            aligned(
-                name_spans(&name, &entry.hits, style),
-                mark.into_iter().collect(),
-                width,
-            )
+            aligned(name_spans(&name, &entry.hits, style), right, width)
         })
         .collect()
+}
+
+fn repo(summary: &Summary) -> Vec<Span<'static>> {
+    let clean = summary.dirty + summary.untracked + summary.ahead + summary.behind == 0;
+    if clean && matches!(summary.branch.as_str(), "main" | "master") {
+        return Vec::new();
+    }
+
+    let mut spans = vec![Span::styled(
+        summary.branch.clone(),
+        Style::new().fg(Color::Cyan),
+    )];
+    let counts = [
+        (format!("*{}", summary.dirty), summary.dirty, Color::Yellow),
+        (
+            format!("?{}", summary.untracked),
+            summary.untracked,
+            Color::Magenta,
+        ),
+        (format!("↑{}", summary.ahead), summary.ahead, Color::Green),
+        (format!("↓{}", summary.behind), summary.behind, Color::Red),
+    ];
+    for (text, count, color) in counts {
+        if count > 0 {
+            spans.push(Span::raw(" "));
+            spans.push(Span::styled(text, Style::new().fg(color)));
+        }
+    }
+
+    spans
 }
 
 pub fn query(query: &str) -> Line<'static> {

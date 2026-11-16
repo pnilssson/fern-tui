@@ -1,7 +1,7 @@
 mod common;
 
 use common::{Result, repo, run, write};
-use fern_git::{Context, Row, diff, locate, status};
+use fern_git::{Context, Row, diff, locate, status, summary};
 
 #[test]
 fn reports_staged_unstaged_and_untracked_changes() -> Result<()> {
@@ -112,6 +112,24 @@ fn locates_the_root_and_the_folder_inside_it() -> Result<()> {
     assert_eq!(found.cwd, found.root.join("src"));
     assert_eq!(std::fs::canonicalize(&found.root)?, root);
     assert!(locate(&std::env::temp_dir().join("fern-not-a-repo-xyz")).is_none());
+
+    Ok(())
+}
+
+#[test]
+fn summary_counts_changes_and_names_a_detached_head_by_its_commit() -> Result<()> {
+    let dir = repo()?;
+    write(dir.path(), "src/main.rs", "fn main() {\n    run();\n}\n")?;
+    write(dir.path(), "scratch.txt", "later\n")?;
+
+    let on_branch = summary(dir.path())?;
+
+    assert_eq!(on_branch.branch, "main");
+    assert_eq!((on_branch.dirty, on_branch.untracked), (1, 1));
+
+    run(dir.path(), &["checkout", "-q", "--detach"])?;
+
+    assert_eq!(summary(dir.path())?.branch.len(), 7);
 
     Ok(())
 }

@@ -165,6 +165,8 @@ impl App {
         };
         self.cwd_rel = rel(&self.root, &cwd);
         self.cwd = cwd;
+        self.repos.clear();
+        self.scan_repos();
     }
 
     fn relocate(&mut self, cwd: PathBuf) -> PathBuf {

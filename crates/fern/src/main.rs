@@ -12,7 +12,7 @@ use std::path::{Component, Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::thread;
 
-use fern_git::Status;
+use fern_git::{Status, Summary};
 use preview::Preview;
 use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event};
@@ -27,6 +27,7 @@ pub enum Msg {
     Input(Event),
     Changed,
     Status(PathBuf, Result<Status, fern_git::Error>),
+    Repo(PathBuf, String, Summary),
     Preview(u64, Preview),
     Resized(u64, Box<Result<ResizeResponse, Errors>>),
     Update(String),

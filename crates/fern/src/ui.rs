@@ -41,29 +41,42 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.preview_area = main;
     preview::draw(frame, app, main, &name.unwrap_or_default());
 
-    if let Some((title, rows)) = app.menu() {
-        menu(frame, body, title, &rows);
+    if let Some((title, rows, legend)) = app.menu() {
+        menu(frame, body, title, &rows, &legend);
     }
 }
 
-fn menu(frame: &mut Frame, body: Rect, title_text: &str, rows: &[(String, &str)]) {
+fn menu(
+    frame: &mut Frame,
+    body: Rect,
+    title_text: &str,
+    rows: &[(String, &str)],
+    legend: &[(String, &str)],
+) {
     let width = rows
         .iter()
+        .chain(legend)
         .map(|(keys, _)| keys.chars().count())
         .max()
         .unwrap_or_default();
-    let lines: Vec<Line> = rows
-        .iter()
-        .map(|(keys, help)| {
-            Line::from(vec![
-                Span::styled(
-                    format!(" {keys:width$}  "),
-                    Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
-                ),
-                Span::raw((*help).to_owned()),
-            ])
-        })
-        .collect();
+    let line = |(keys, help): &(String, &str)| {
+        Line::from(vec![
+            Span::styled(
+                format!(" {keys:width$}  "),
+                Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw((*help).to_owned()),
+        ])
+    };
+    let mut lines: Vec<Line> = rows.iter().map(line).collect();
+    if !legend.is_empty() {
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            " Legend ",
+            Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
+        )));
+        lines.extend(legend.iter().map(line));
+    }
     let height = u16::try_from(lines.len() + 2).unwrap_or(u16::MAX);
     let area = Rect {
         y: body.bottom().saturating_sub(height).max(body.y),

@@ -47,6 +47,20 @@ const PREVIEW: [Binding; 9] = [
     ("q", "Quit"),
 ];
 
+const REPOS: [Binding; 4] = [
+    ("*", "Changed files"),
+    ("?", "Untracked files"),
+    ("↑", "Commits ahead of upstream"),
+    ("↓", "Commits behind upstream"),
+];
+
+pub(super) fn legend(mode: Mode, focus: Focus) -> &'static [Binding] {
+    match (focus, mode) {
+        (Focus::List, Mode::Files) => &REPOS,
+        _ => &[],
+    }
+}
+
 pub(super) fn bindings(mode: Mode, focus: Focus) -> &'static [Binding] {
     match (focus, mode) {
         (Focus::Preview, _) => &PREVIEW,

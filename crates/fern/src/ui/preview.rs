@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use fern_git::Context;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -125,7 +127,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
             } else {
                 format!("{}/{name}", app.cwd_rel)
             };
-            let items: Vec<ListItem> = files::rows(app, entries, &base, cols)
+            let items: Vec<ListItem> = files::rows(app, entries, &base, &HashMap::new(), cols)
                 .into_iter()
                 .map(|spans| ListItem::new(Line::from(spans)))
                 .collect();

@@ -30,9 +30,38 @@ impl Change {
 #[derive(Clone, Debug, Default)]
 pub struct Status {
     pub branch: String,
+    pub oid: String,
     pub ahead: u32,
     pub behind: u32,
     pub changes: Vec<Change>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Summary {
+    pub branch: String,
+    pub ahead: u32,
+    pub behind: u32,
+    pub dirty: u32,
+    pub untracked: u32,
+}
+
+pub fn summary(root: &Path) -> Result<Summary, Error> {
+    let output = git(root, &["status", "--porcelain=v2", "-z", "--branch"])?;
+    let status = parse(&String::from_utf8_lossy(&output));
+    let untracked = status.changes.iter().filter(|c| c.untracked()).count();
+    let branch = if status.branch == "(detached)" {
+        status.oid.chars().take(7).collect()
+    } else {
+        status.branch
+    };
+
+    Ok(Summary {
+        branch,
+        ahead: status.ahead,
+        behind: status.behind,
+        dirty: u32::try_from(status.changes.len() - untracked).unwrap_or(u32::MAX),
+        untracked: u32::try_from(untracked).unwrap_or(u32::MAX),
+    })
 }
 
 pub fn status(root: &Path) -> Result<Status, Error> {
@@ -104,7 +133,9 @@ fn parse(text: &str) -> Status {
 }
 
 fn header_line(status: &mut Status, header: &str) {
-    if let Some(branch) = header.strip_prefix("branch.head ") {
+    if let Some(oid) = header.strip_prefix("branch.oid ") {
+        oid.clone_into(&mut status.oid);
+    } else if let Some(branch) = header.strip_prefix("branch.head ") {
         branch.clone_into(&mut status.branch);
     } else if let Some(counts) = header.strip_prefix("branch.ab ") {
         let mut parts = counts.split(' ');

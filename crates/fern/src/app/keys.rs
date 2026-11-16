@@ -53,7 +53,10 @@ impl App {
             KeyCode::Tab => self.toggle_mode(),
             KeyCode::Char('f') if !ctrl => self.start_filter(),
             KeyCode::Char('d') if !ctrl => self.toggle_context(),
-            KeyCode::Char('R') => self.refresh_all(),
+            KeyCode::Char('R') => {
+                self.refresh_all();
+                self.scan_repos();
+            }
             KeyCode::Char('.') => self.toggle_hidden(),
             KeyCode::Char('n') => self.jump_hunk(true),
             KeyCode::Char('N') => self.jump_hunk(false),

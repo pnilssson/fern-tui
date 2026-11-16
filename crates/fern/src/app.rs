@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use std::time::{Duration, Instant};
 
-use fern_git::{Change, Context, Status};
+use fern_git::{Change, Context, Status, Summary};
 use nucleo_matcher::{Config, Matcher};
 use ratatui::crossterm::event::Event;
 use ratatui::layout::Rect;
@@ -43,7 +43,8 @@ struct Notice {
     expires: Instant,
 }
 
-pub type Menu = (&'static str, Vec<(String, &'static str)>);
+pub type Rows = Vec<(String, &'static str)>;
+pub type Menu = (&'static str, Rows, Rows);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Chord {
@@ -79,6 +80,7 @@ pub struct App {
     pub git_error: Option<String>,
     pub marks: HashMap<String, Change>,
     pub dirty_dirs: HashSet<String>,
+    pub repos: HashMap<String, Summary>,
     pub changes_state: ListState,
 
     pub preview: Preview,
@@ -102,6 +104,13 @@ pub struct App {
     latest: u64,
     requests: Sender<Request>,
     messages: Sender<Msg>,
+}
+
+fn owned(bindings: &[(&'static str, &'static str)]) -> Rows {
+    bindings
+        .iter()
+        .map(|(keys, help)| ((*keys).to_owned(), *help))
+        .collect()
 }
 
 pub fn rel(root: &Path, path: &Path) -> String {
@@ -141,6 +150,7 @@ impl App {
             git_error: None,
             marks: HashMap::new(),
             dirty_dirs: HashSet::new(),
+            repos: HashMap::new(),
             changes_state: ListState::default(),
             preview: Preview::Empty,
             preview_scroll: 0,
@@ -165,6 +175,7 @@ impl App {
         };
         app.load_dir(None);
         app.refresh_git();
+        app.scan_repos();
 
         app
     }
@@ -200,13 +211,12 @@ impl App {
                     .iter()
                     .map(|(key, _, help)| (key.to_string(), *help))
                     .collect(),
+                Vec::new(),
             ),
             Chord::Help => (
                 "Keys",
-                help::bindings(self.mode, self.focus)
-                    .iter()
-                    .map(|(keys, help)| ((*keys).to_owned(), *help))
-                    .collect(),
+                owned(help::bindings(self.mode, self.focus)),
+                owned(help::legend(self.mode, self.focus)),
             ),
         };
 
@@ -220,6 +230,7 @@ impl App {
             Msg::Input(_) => {}
             Msg::Changed => self.refresh_all(),
             Msg::Status(root, result) => self.apply_status(&root, result),
+            Msg::Repo(cwd, name, summary) => self.apply_repo(&cwd, name, summary),
             Msg::Preview(id, preview) => self.apply_preview(id, preview),
             Msg::Resized(id, result) => self.apply_resized(id, *result),
             Msg::Update(version) => self.update = Some(version),
