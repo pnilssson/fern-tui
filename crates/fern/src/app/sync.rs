@@ -143,6 +143,7 @@ impl App {
         let fresh = self.wanted_key != self.shown_key;
         if fresh {
             self.selection = None;
+            self.search = None;
             self.shown_key.clone_from(&self.wanted_key);
         }
         self.preview = preview;
@@ -155,6 +156,7 @@ impl App {
         self.preview_scroll = self
             .preview_scroll
             .min(self.preview.len().saturating_sub(1));
+        self.rescan();
     }
 
     pub(super) fn apply_resized(&mut self, id: u64, result: Result<ResizeResponse, Errors>) {
@@ -210,6 +212,7 @@ impl App {
         self.preview = preview;
         self.preview_scroll = 0;
         self.selection = None;
+        self.search = None;
         self.shown_key.clear();
     }
 }

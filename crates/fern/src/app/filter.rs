@@ -42,7 +42,7 @@ fn text(filter: Option<&String>) -> Option<String> {
     filter.filter(|query| !query.is_empty()).cloned()
 }
 
-fn delete_word(query: &mut String) {
+pub(super) fn delete_word(query: &mut String) {
     query.truncate(query.trim_end().len());
     query.truncate(query.rfind(' ').map_or(0, |space| space + 1));
 }

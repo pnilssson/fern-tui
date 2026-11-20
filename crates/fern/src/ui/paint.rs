@@ -1,4 +1,4 @@
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 
 type Key = (bool, Option<Color>);
@@ -46,7 +46,12 @@ fn chunk(text: String, (on, color): Key, strong: Style) -> Span<'static> {
     Span::styled(text, style)
 }
 
-pub fn reverse(line: Line<'static>, lead: usize, from: usize, to: usize) -> Line<'static> {
+pub fn patch(
+    line: Line<'static>,
+    lead: usize,
+    (from, to): (usize, usize),
+    patch: Style,
+) -> Line<'static> {
     let style = line.style;
     let mut spans = Vec::new();
     let mut at = 0;
@@ -70,10 +75,7 @@ pub fn reverse(line: Line<'static>, lead: usize, from: usize, to: usize) -> Line
         let part = |range: std::ops::Range<usize>| chars[range].iter().collect::<String>();
         let pieces = [
             (part(0..first), span.style),
-            (
-                part(first..last),
-                span.style.add_modifier(Modifier::REVERSED),
-            ),
+            (part(first..last), span.style.patch(patch)),
             (part(last..chars.len()), span.style),
         ];
         spans.extend(

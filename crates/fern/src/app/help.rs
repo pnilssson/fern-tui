@@ -35,11 +35,12 @@ const CHANGES: [Binding; 13] = [
     ("q", "Quit"),
 ];
 
-const PREVIEW: [Binding; 9] = [
+const PREVIEW: [Binding; 10] = [
     ("↑ ↓  j k", "Scroll"),
     ("ctrl-u ctrl-d", "Half page up / down"),
     ("g G", "Top / bottom"),
     ("n N", "Next / previous change"),
+    ("f", "Search, ⏎ ↓ next, ↑ previous"),
     ("d", "Full file / diff"),
     ("← h esc", "Back to the list"),
     ("drag", "Select text, copy on release"),

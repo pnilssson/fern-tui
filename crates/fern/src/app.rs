@@ -3,6 +3,7 @@ mod filter;
 mod help;
 mod keys;
 mod nav;
+mod search;
 mod select;
 mod sync;
 
@@ -36,6 +37,7 @@ pub enum Focus {
     Preview,
 }
 
+pub use search::{Hit, Search};
 pub use select::{Selection, Visual};
 
 struct Notice {
@@ -90,6 +92,7 @@ pub struct App {
     pub preview_inner: Rect,
     pub preview_rows: Vec<Visual>,
     pub selection: Option<Selection>,
+    pub search: Option<Search>,
 
     listing: Vec<Entry>,
     matcher: Matcher,
@@ -159,6 +162,7 @@ impl App {
             preview_inner: Rect::default(),
             preview_rows: Vec::new(),
             selection: None,
+            search: None,
             listing: Vec::new(),
             matcher: Matcher::new(Config::DEFAULT.match_paths()),
             notice: None,

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use fern_git::Context;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem, Paragraph};
 use ratatui_image::{Resize, StatefulImage};
@@ -11,9 +11,15 @@ use ratatui_image::{Resize, StatefulImage};
 use super::wrap::wrap;
 use super::{center, clean, diff, dim, files, pane, title};
 use super::{paint, ruler};
-use crate::app::{App, Focus, Selection, Visual};
+use crate::app::{App, Focus, Hit, Search, Selection, Visual};
 use crate::highlight::Colors;
 use crate::preview::Preview;
+
+const MATCH: Style = Style::new().fg(Color::Black).bg(Color::Yellow);
+const CURRENT: Style = Style::new()
+    .fg(Color::Black)
+    .bg(Color::Cyan)
+    .add_modifier(Modifier::BOLD);
 
 fn max_scroll(preview: &Preview, height: usize, cols: usize) -> usize {
     let rows = preview.len();
@@ -72,7 +78,10 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
         "{heading}{}",
         ruler::summary(&app.preview, app.preview_scroll, max)
     );
-    let block = pane(title(&heading, area.width), app.focus == Focus::Preview);
+    let mut block = pane(title(&heading, area.width), app.focus == Focus::Preview);
+    if let Some(search) = &app.search {
+        block = block.title_bottom(bar(search));
+    }
     let inner = block.inner(area);
     frame.render_widget(block, area);
     app.preview_height = usize::from(inner.height);
@@ -100,6 +109,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
     let height = usize::from(inner.height);
     let cols = usize::from(inner.width);
     let selection = app.selection;
+    let search = app.search.as_ref();
     let rows = match &app.preview {
         Preview::Empty | Preview::Image(_) => Vec::new(),
         Preview::Message(text) => {
@@ -114,7 +124,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
             let (shown, rows) = fill(
                 (0..lines.len()).skip(skip),
                 (height, *truncated),
-                selection,
+                (selection, search),
                 (|index| plain(&lines[index], colors.get(index), cols), |_| 0),
             );
             frame.render_widget(Paragraph::new(shown), inner);
@@ -140,7 +150,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
             let (shown, rows) = fill(
                 (0..diff.rows.len()).skip(skip),
                 (height, diff.truncated),
-                selection,
+                (selection, search),
                 (
                     |index| diff::lines(&diff.rows, colors, index, digits, cols),
                     |index| diff::lead(&diff.rows, index),
@@ -158,7 +168,7 @@ pub fn draw(frame: &mut Frame, app: &mut App, area: Rect, name: &str) {
 fn fill(
     items: impl Iterator<Item = usize>,
     (height, truncated): (usize, bool),
-    selection: Option<Selection>,
+    (selection, search): (Option<Selection>, Option<&Search>),
     (render, lead): (
         impl Fn(usize) -> Vec<Line<'static>>,
         impl Fn(usize) -> usize,
@@ -173,6 +183,8 @@ fn fill(
 
         let lead = lead(index);
         let range = selection.and_then(|selection| selection.range(index));
+        let hits = search.map_or(&[][..], |search| search.row(index));
+        let current = search.and_then(|search| search.hits.get(search.current));
         let mut start = 0;
         for line in render(index) {
             let text: String = line
@@ -189,12 +201,13 @@ fn fill(
                 gutter,
                 text,
             });
+            let line = lit(line, lead, (start, length), (hits, current));
             shown.push(match range {
-                Some((from, to)) => paint::reverse(
+                Some((from, to)) => paint::patch(
                     line,
                     lead,
-                    from.saturating_sub(start),
-                    to.saturating_sub(start),
+                    (from.saturating_sub(start), to.saturating_sub(start)),
+                    Style::new().add_modifier(Modifier::REVERSED),
                 ),
                 None => line,
             });
@@ -209,6 +222,51 @@ fn fill(
     visuals.truncate(height);
 
     (shown, visuals)
+}
+
+fn lit(
+    mut line: Line<'static>,
+    lead: usize,
+    (start, length): (usize, usize),
+    (hits, current): (&[Hit], Option<&Hit>),
+) -> Line<'static> {
+    for hit in hits
+        .iter()
+        .filter(|hit| hit.to > start && hit.from < start + length)
+    {
+        let style = if Some(hit) == current { CURRENT } else { MATCH };
+        line = paint::patch(
+            line,
+            lead,
+            (hit.from.saturating_sub(start), hit.to - start),
+            style,
+        );
+    }
+
+    line
+}
+
+fn bar(search: &Search) -> Line<'static> {
+    let mut spans = vec![
+        Span::styled(
+            format!(" /{}", search.query),
+            Style::new().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ", Style::new().add_modifier(Modifier::REVERSED)),
+    ];
+    if !search.query.is_empty() {
+        spans.push(if search.hits.is_empty() {
+            Span::styled("  no matches", Style::new().fg(Color::Red))
+        } else {
+            Span::styled(
+                format!("  {}/{}", search.current + 1, search.hits.len()),
+                dim(),
+            )
+        });
+    }
+    spans.push(Span::raw(" "));
+
+    Line::from(spans)
 }
 
 fn plain(text: &str, colors: Option<&Colors>, cols: usize) -> Vec<Line<'static>> {

@@ -25,6 +25,12 @@ impl App {
             return;
         }
 
+        if self.search.is_some() {
+            self.search_key(key);
+
+            return;
+        }
+
         if self.filtering() {
             self.filter_key(key);
 
@@ -51,6 +57,7 @@ impl App {
             KeyCode::Char('2') => self.set_mode(Mode::Changes),
             KeyCode::Char('0') => self.read(),
             KeyCode::Tab => self.toggle_mode(),
+            KeyCode::Char('f') if !ctrl && self.focus == Focus::Preview => self.start_search(),
             KeyCode::Char('f') if !ctrl => self.start_filter(),
             KeyCode::Char('d') if !ctrl => self.toggle_context(),
             KeyCode::Char('R') => {
