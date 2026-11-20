@@ -17,14 +17,16 @@ use crate::app::{App, Mode};
 
 const ACCENT: Color = Color::Cyan;
 const MAX_CELL: usize = 2000;
+const MAX_SIDE: u16 = 50;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let [body, footer] =
         Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).areas(frame.area());
     frame.render_widget(footer_line(app), footer);
 
+    let side_width = (body.width * 35 / 100).min(MAX_SIDE);
     let [side, main] =
-        Layout::horizontal([Constraint::Percentage(35), Constraint::Percentage(65)]).areas(body);
+        Layout::horizontal([Constraint::Length(side_width), Constraint::Fill(1)]).areas(body);
     if app.in_repo {
         let [top, bottom] =
             Layout::vertical([Constraint::Percentage(60), Constraint::Percentage(40)]).areas(side);
