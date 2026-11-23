@@ -78,8 +78,7 @@ pub fn status(root: &Path) -> Result<Status, Error> {
 
     let mut status = parse(&String::from_utf8_lossy(&output));
     let counts = git(root, &["diff", "HEAD", "--numstat", "-z", "--no-renames"])
-        .map(|output| numstat(&String::from_utf8_lossy(&output)))
-        .unwrap_or_default();
+        .map_or_default(|output| numstat(&String::from_utf8_lossy(&output)));
     for change in &mut status.changes {
         if let Some(&(adds, dels)) = counts.get(&change.path) {
             change.adds = adds;
