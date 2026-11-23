@@ -13,7 +13,7 @@ Before changing Rust, read `crates/AGENTS.md`.
 - Never launch the TUI for visual checks unless asked; the user runs it in their own terminal.
 - Run `just check` before committing or pushing and fix what it finds. Add an `#[allow]`, lint override, ignore entry or lower threshold only after the user agrees.
 - Allow permissive and file-level copyleft licenses (BSD, ISC, Zlib, MPL-2.0) in cargo-deny without asking; ask before GPL, LGPL, AGPL or other strong copyleft.
-- Leave changes uncommitted until the user asks. Work on `main`, without branches or pull requests unless asked.
+- Release class: free. Commit freely and push to main yourself once the checks pass; pushing main cuts a release (`main.yml`).
 - These files hold only rules an agent would otherwise get wrong and no check enforces. When a rule changes, replace the old one; add a new one only when the user asks.
 
 ## Code
