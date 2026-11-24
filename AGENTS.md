@@ -25,7 +25,4 @@ Before changing Rust, read `crates/AGENTS.md`.
 - Use the terminal's ANSI palette so fern follows the theme of the terminal it runs in; syntax colors come from the ANSI theme in two-face; the only fixed colors are the dark diff tints (indexed 22, 28, 52, 88).
 
 ## Testing
-- Test by risk: integrations with git, and parsing data we don't own. Test behaviour through public interfaces with real captured data.
-- Add a test that reproduces each bug before fixing it.
-- Skip tests for presentation, glue and trivial code.
 - Use neutral sample data (`app`, `src/main.rs`), never the project's own name or real people's names.
